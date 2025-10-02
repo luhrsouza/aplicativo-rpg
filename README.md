@@ -12,6 +12,7 @@ Este projeto foi desenvolvido como parte da disciplina Programação de Disposit
 2.  Navegue até a pasta do projeto: `cd aplicativo-rpg`
 3.  Instale as dependências: `flutter pub get`
 4.  Execute o aplicativo: `flutter run`
+5.  Inicie o aplicativo pelo arquivo: `main.dart`
 
 ### Bugs Conhecidos
 * Ao adicionar ou criar uma campanha, é preciso mudar de página e voltar pra poder visualizar.
