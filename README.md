@@ -1,16 +1,22 @@
-# aplicativo_rpg
+# 🎲 Aplicativo de RPG - Gerenciador de Campanhas
 
-A new Flutter project.
+## 📝 Descrição do Projeto
 
-## Getting Started
+Este projeto foi desenvolvido como parte da disciplina Programação de Dispositivos Móveis do curso de ADS da UTFPR. O objetivo é um aplicativo móvel, construído em Flutter, que serve como uma ferramenta auxiliar para jogadores e mestres de RPG de mesa. Ele permite a criação de contas, gerenciamento de campanhas, agendamento de sessões e o armazenamento de fichas de personagem.
 
-This project is a starting point for a Flutter application.
+---
 
-A few resources to get you started if this is your first Flutter project:
+## 🚀 Como Executar o Projeto
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+1.  Clone o repositório: `git clone https://github.com/luhrsouza/aplicativo-rpg.git`
+2.  Navegue até a pasta do projeto: `cd aplicativo-rpg`
+3.  Instale as dependências: `flutter pub get`
+4.  Execute o aplicativo: `flutter run`
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Bugs Conhecidos
+* Ao adicionar ou criar uma campanha, é preciso mudar de página e voltar pra poder visualizar.
+
+## 👥 Equipe e Contribuições
+ Integrante | Atividades Desenvolvidas | RA
+| Luciana Ramos de Souza| Todo o projeto | a2566150
+
