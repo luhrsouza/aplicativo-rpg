@@ -1,8 +1,9 @@
-import 'dart:math';
-import '../models/campaign.dart';
-import 'auth_controller.dart';
-import '../models/session.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/campaign.dart';
+import 'dart:math';
+import '../models/session.dart';
+import 'auth_controller.dart';
 
 class CampaignController extends ChangeNotifier {
   static final CampaignController _instance = CampaignController._internal();
@@ -12,140 +13,137 @@ class CampaignController extends ChangeNotifier {
   CampaignController._internal();
 
   final AuthController _authController = AuthController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  final List<Campaign> _campaigns = [];
+  CollectionReference get _campaignsCollection => _firestore.collection('campaigns');
+  CollectionReference get _sessionsCollection => _firestore.collection('sessions');
 
-  void createCampaign({
+  Future<void> createCampaign({
     required String name,
     required String description,
-  }) {
+  }) async {
     final currentUser = _authController.currentUser;
-    if (currentUser == null) {
-      print('Erro: Nenhum usuário logado para criar a campanha.');
-      return;
-    }
+    if (currentUser == null) return;
 
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random();
     final campaignCode = String.fromCharCodes(Iterable.generate(
         6, (_) => chars.codeUnitAt(random.nextInt(chars.length))));
 
     final newCampaign = Campaign(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: '',
       name: name,
       description: description,
       masterUserId: currentUser.id,
       campaignCode: campaignCode,
-      playerUserIds: [],
+      playerUserIds: [currentUser.id],
+      sessions: [],
     );
 
-    _campaigns.add(newCampaign);
-    print('Campanha criada: ${newCampaign.name} com o código: ${newCampaign.campaignCode}');
+    await _campaignsCollection.add(newCampaign.toJson());
   }
 
-  List<Campaign> getCampaignsForCurrentUser() {
+  Stream<List<Campaign>> getCampaignsStream() {
     final currentUser = _authController.currentUser;
-    if (currentUser == null) {
-      return [];
-    }
+    if (currentUser == null) return Stream.value([]);
 
-    return _campaigns.where((campaign) {
-      final isMaster = campaign.masterUserId == currentUser.id;
-      final isPlayer = campaign.playerUserIds.contains(currentUser.id);
-      return isMaster || isPlayer;
-    }).toList();
+    return _campaignsCollection
+        .where('playerUserIds', arrayContains: currentUser.id)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => Campaign.fromSnapshot(doc)).toList();
+    });
   }
 
-  Future<bool> joinCampaignByCode(String code) async {
+  Stream<Campaign> getCampaignStream(String campaignId) {
+    return _campaignsCollection
+        .doc(campaignId)
+        .snapshots()
+        .map((doc) => Campaign.fromSnapshot(doc));
+  }
+
+  Stream<List<Session>> getSessionsStream(String campaignId) {
+    return _sessionsCollection
+        .where('campaignId', isEqualTo: campaignId)
+        .orderBy('dateTime', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return Session.fromJson(doc.id, doc.data() as Map<String, dynamic>);
+      }).toList();
+    });
+  }
+
+  Future<String?> joinCampaignByCode(String code) async {
     final currentUser = _authController.currentUser;
-    if (currentUser == null) return false;
+    if (currentUser == null) return "Usuário não logado";
 
     try {
-      final campaign = _campaigns.firstWhere((c) => c.campaignCode == code);
+      final query = await _campaignsCollection
+          .where('campaignCode', isEqualTo: code.trim().toUpperCase())
+          .limit(1)
+          .get();
 
-      if (campaign.masterUserId != currentUser.id && !campaign.playerUserIds.contains(currentUser.id)) {
-        campaign.playerUserIds.add(currentUser.id);
-        print('Usuário ${currentUser.name} entrou na campanha ${campaign.name}');
-        return true;
+      if (query.docs.isEmpty) {
+        return "Código de campanha não encontrado.";
       }
-      return false;
+
+      final campaignDoc = query.docs.first;
+
+      await campaignDoc.reference.update({
+        'playerUserIds': FieldValue.arrayUnion([currentUser.id])
+      });
+      return null; // Sucesso
     } catch (e) {
-      return false;
+      return "Erro ao entrar na campanha: ${e.toString()}";
     }
   }
 
-  void removePlayer(String campaignId, String playerId) {
-    try {
-      final campaign = _campaigns.firstWhere((c) => c.id == campaignId);
-      campaign.playerUserIds.remove(playerId);
-      print('Jogador $playerId removido da campanha ${campaign.name}');
-    } catch (e) {
-      print('Erro ao remover jogador: campanha não encontrada.');
+  Future<void> removePlayer(String campaignId, String playerId) async {
+    final campaignRef = _campaignsCollection.doc(campaignId);
+
+    final doc = await campaignRef.get();
+    final data = doc.data() as Map<String, dynamic>;
+    final masterId = data['masterUserId'] as String;
+
+    if (playerId == masterId) {
+      print("Não é permitido remover o mestre da campanha.");
+      return;
     }
+
+    await campaignRef.update({
+      'playerUserIds': FieldValue.arrayRemove([playerId])
+    });
   }
 
-  void scheduleSession(String campaignId, DateTime dateTime, String description) {
-    try {
-      final campaignIndex = _campaigns.indexWhere((c) => c.id == campaignId);
+  Future<void> scheduleSession(String campaignId, DateTime dateTime, String description) async {
+    final campaignDoc = await _campaignsCollection.doc(campaignId).get();
+    if (!campaignDoc.exists) return;
 
-      if (campaignIndex != -1) {
-        final oldCampaign = _campaigns[campaignIndex];
+    final campaign = Campaign.fromSnapshot(campaignDoc);
 
-        final attendanceMap = <String, AttendanceStatus>{};
-        for (var playerId in oldCampaign.playerUserIds) {
-          attendanceMap[playerId] = AttendanceStatus.pending;
-        }
-
-        final newSession = Session(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          campaignId: campaignId,
-          dateTime: dateTime,
-          description: description,
-          attendance: attendanceMap,
-        );
-
-        final updatedSessions = List<Session>.from(oldCampaign.sessions)..add(newSession);
-
-        final updatedCampaign = Campaign(
-          id: oldCampaign.id,
-          name: oldCampaign.name,
-          description: oldCampaign.description,
-          masterUserId: oldCampaign.masterUserId,
-          campaignCode: oldCampaign.campaignCode,
-          playerUserIds: oldCampaign.playerUserIds,
-          sessions: updatedSessions,
-        );
-        _campaigns[campaignIndex] = updatedCampaign;
-
-      } else {
-        print('Erro ao agendar sessão: campanha não encontrada (indexWhere falhou).');
-      }
-    } catch (e) {
-      print('Ocorreu um erro inesperado em scheduleSession: $e');
+    final attendanceMap = <String, AttendanceStatus>{};
+    for (var playerId in campaign.playerUserIds) {
+      attendanceMap[playerId] = AttendanceStatus.pending;
     }
+
+    final newSession = Session(
+      id: '',
+      campaignId: campaignId,
+      dateTime: dateTime,
+      description: description,
+      attendance: attendanceMap,
+    );
+
+    await _sessionsCollection.add(newSession.toJson());
   }
 
-  void respondToSession(String sessionId, AttendanceStatus status) {
+  Future<void> respondToSession(String sessionId, AttendanceStatus status) async {
     final currentUser = _authController.currentUser;
     if (currentUser == null) return;
 
-    for (var campaign in _campaigns) {
-      for (var session in campaign.sessions) {
-        if (session.id == sessionId) {
-          session.attendance[currentUser.id] = status;
-
-          print('>>> ATUALIZAÇÃO: Status do usuário ${currentUser.name} alterado para ${status.name} <<<');
-          return;
-        }
-      }
-    }
-  }
-
-  Campaign? getCampaignById(String campaignId) {
-    try {
-      return _campaigns.firstWhere((c) => c.id.trim() == campaignId.trim());
-    } catch (e) {
-      return null;
-    }
+    await _sessionsCollection.doc(sessionId).update({
+      'attendance.${currentUser.id}': status.name,
+    });
   }
 }

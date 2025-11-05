@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'session.dart';
 
 class Campaign {
@@ -18,4 +19,27 @@ class Campaign {
     this.playerUserIds = const [],
     this.sessions = const [],
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'description': description,
+      'masterUserId': masterUserId,
+      'campaignCode': campaignCode,
+      'playerUserIds': playerUserIds,
+    };
+  }
+
+  factory Campaign.fromSnapshot(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Campaign(
+      id: doc.id,
+      name: data['name'] as String,
+      description: data['description'] as String,
+      masterUserId: data['masterUserId'] as String,
+      campaignCode: data['campaignCode'] as String,
+      playerUserIds: List<String>.from(data['playerUserIds'] ?? []),
+      sessions: [],
+    );
+  }
 }

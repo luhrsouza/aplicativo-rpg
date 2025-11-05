@@ -16,28 +16,23 @@ class _CreateCampaignScreenState extends State<CreateCampaignScreen> {
   final _descriptionController = TextEditingController();
   bool _isLoading = false;
 
-  void _submitForm() {
+  void _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
       });
 
-      _campaignController.createCampaign(
+      await _campaignController.createCampaign(
         name: _nameController.text,
         description: _descriptionController.text,
       );
 
-      Future.delayed(const Duration(seconds: 1)).then((_) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Campanha criada com sucesso!')),
-          );
-          Navigator.of(context).pop(true);
-        }
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Campanha criada com sucesso!')),
+        );
+        Navigator.of(context).pop();
+      }
     }
   }
 

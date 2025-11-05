@@ -1,7 +1,10 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/character_sheet.dart';
 import 'auth_controller.dart';
 
-class CharacterController {
+class CharacterController extends ChangeNotifier {
+  // --- Singleton ---
   static final CharacterController _instance = CharacterController._internal();
   factory CharacterController() {
     return _instance;
@@ -9,28 +12,25 @@ class CharacterController {
   CharacterController._internal();
 
   final AuthController _authController = AuthController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  final List<CharacterSheet> _sheets = [];
+  CollectionReference get _sheetsCollection => _firestore.collection('sheets');
 
   final List<String> availableSystems = [
-    'D&D 5e',
-    'Ordem Paranormal',
-    'Tormenta20',
-    'Call of Cthulhu',
-    'Outro',
+    'D&D 5e', 'Pathfinder 2e', 'Tormenta20', 'Ordem Paranormal',
   ];
 
-  void createSheet({
+  Future<void> createSheet({
     required String characterName,
     required String className,
     required int level,
     required String system,
-  }) {
+  }) async {
     final currentUser = _authController.currentUser;
     if (currentUser == null) return;
 
     final newSheet = CharacterSheet(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: '',
       ownerUserId: currentUser.id,
       characterName: characterName,
       className: className,
@@ -38,40 +38,49 @@ class CharacterController {
       system: system,
     );
 
-    _sheets.add(newSheet);
-    print('Ficha criada: ${newSheet.characterName} para o usuário ${currentUser.name}');
+    await _sheetsCollection.add(newSheet.toJson());
   }
 
-  List<CharacterSheet> getSheetsForCurrentUser() {
+  Stream<List<CharacterSheet>> getSheetsStreamForCurrentUser() {
     final currentUser = _authController.currentUser;
-    if (currentUser == null) return [];
+    if (currentUser == null) {
+      return Stream.value([]);
+    }
 
-    return _sheets.where((sheet) => sheet.ownerUserId == currentUser.id).toList();
+    // Cria uma consulta no Firestore
+    return _sheetsCollection
+        .where('ownerUserId', isEqualTo: currentUser.id)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => CharacterSheet.fromSnapshot(doc)).toList();
+    });
   }
 
-  void editSheet({
+  Future<void> editSheet({
     required String sheetId,
     required String newCharacterName,
     required String newClassName,
     required int newLevel,
     required String newSystem,
-  }) {
-    try {
-      final sheetToEdit = _sheets.firstWhere((sheet) => sheet.id == sheetId);
+  }) async {
+    final updates = {
+      'characterName': newCharacterName,
+      'className': newClassName,
+      'level': newLevel,
+      'system': newSystem,
+    };
 
-      sheetToEdit.characterName = newCharacterName;
-      sheetToEdit.className = newClassName;
-      sheetToEdit.level = newLevel;
-      sheetToEdit.system = newSystem;
-
-      print('Ficha editada com sucesso: ${sheetToEdit.characterName}');
-    } catch (e) {
-      print('Erro ao editar ficha: Ficha com ID $sheetId não encontrada.');
-    }
+    await _sheetsCollection.doc(sheetId).update(updates);
   }
 
-  void deleteSheets(List<String> sheetIds) {
-    _sheets.removeWhere((sheet) => sheetIds.contains(sheet.id));
-    print('Fichas deletadas com sucesso: $sheetIds');
+  Future<void> deleteSheets(List<String> sheetIds) async {
+    // Para deletar múltiplos itens, usamos um "batch write"
+    final batch = _firestore.batch();
+
+    for (final id in sheetIds) {
+      batch.delete(_sheetsCollection.doc(id));
+    }
+
+    await batch.commit();
   }
 }

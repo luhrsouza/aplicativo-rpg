@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "717033580983",
+    "project_id": "aplicativo-rpg-dicell",
+    "storage_bucket": "aplicativo-rpg-dicell.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:717033580983:android:03297c3b5dade3677a2032",
+        "android_client_info": {
+          "package_name": "com.example.aplicativo_rpg"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCkZ5jjPzIpbNF9R02x7SKvLTcSCnZOi4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

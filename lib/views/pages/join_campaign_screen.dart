@@ -20,21 +20,21 @@ class _JoinCampaignScreenState extends State<JoinCampaignScreen> {
         _isLoading = true;
       });
 
-      final success = await _campaignController.joinCampaignByCode(_codeController.text.toUpperCase());
+      final result = await _campaignController.joinCampaignByCode(_codeController.text.toUpperCase());
 
       setState(() {
         _isLoading = false;
       });
 
       if (mounted) {
-        if (success) {
+        if (result == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Você entrou na campanha!')),
           );
-          Navigator.of(context).pop(true);
+          Navigator.of(context).pop();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Código inválido ou você já está na campanha.')),
+            SnackBar(content: Text(result)),
           );
         }
       }
