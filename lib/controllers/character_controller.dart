@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/character_sheet.dart';
 import 'auth_controller.dart';
+import '../service/dnd_api_service.dart';
 
 class CharacterController extends ChangeNotifier {
-  // --- Singleton ---
   static final CharacterController _instance = CharacterController._internal();
   factory CharacterController() {
     return _instance;
@@ -17,8 +17,24 @@ class CharacterController extends ChangeNotifier {
   CollectionReference get _sheetsCollection => _firestore.collection('sheets');
 
   final List<String> availableSystems = [
-    'D&D 5e', 'Pathfinder 2e', 'Tormenta20', 'Ordem Paranormal',
+    'D&D 5e',
   ];
+  final DndApiService _apiService = DndApiService();
+  List<String> loadedClasses = [];
+
+  Future<void> loadClassesFromApi() async {
+    if (loadedClasses.isNotEmpty) return;
+
+    print('Buscando classes na API de D&D...');
+    try {
+      final classes = await _apiService.fetchClasses();
+      loadedClasses = classes;
+      notifyListeners();
+      print('Classes carregadas: $loadedClasses');
+    } catch (e) {
+      print('Erro no controller ao buscar classes: $e');
+    }
+  }
 
   Future<void> createSheet({
     required String characterName,

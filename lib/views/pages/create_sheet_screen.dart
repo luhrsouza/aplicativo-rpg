@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../controllers/character_controller.dart';
+import 'package:provider/provider.dart';
 
 class CreateSheetScreen extends StatefulWidget {
   const CreateSheetScreen({super.key});
@@ -9,14 +10,22 @@ class CreateSheetScreen extends StatefulWidget {
 }
 
 class _CreateSheetScreenState extends State<CreateSheetScreen> {
-  final CharacterController _characterController = CharacterController();
+  late CharacterController _characterController = CharacterController();
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
   final _classController = TextEditingController();
   final _levelController = TextEditingController();
   String? _selectedSystem;
+  String? _selectedClass;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _characterController = Provider.of<CharacterController>(context, listen: false);
+    _characterController.loadClassesFromApi();
+  }
 
   void _submitForm() {
     if (_formKey.currentState?.validate() ?? false) {
@@ -26,7 +35,7 @@ class _CreateSheetScreenState extends State<CreateSheetScreen> {
 
       _characterController.createSheet(
         characterName: _nameController.text,
-        className: _classController.text,
+          className: _selectedClass!,
         level: int.tryParse(_levelController.text) ?? 1,
         system: _selectedSystem!,
       );
@@ -44,91 +53,82 @@ class _CreateSheetScreenState extends State<CreateSheetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final availableSystems = _characterController.availableSystems;
+    return Consumer<CharacterController>(
+      builder: (context, controller, child) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Criar Nova Ficha')),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(labelText: 'Nome do Personagem', border: OutlineInputBorder()),
+                    validator: (value) => (value?.isEmpty ?? true) ? 'O nome é obrigatório' : null,
+                  ),
+                  const SizedBox(height: 16),
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Criar Nova Ficha'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nome do Personagem',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) => (value?.isEmpty ?? true) ? 'O nome é obrigatório' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _classController,
-                decoration: const InputDecoration(
-                  labelText: 'Classe (ex: Guerreiro, Mago)',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) => (value?.isEmpty ?? true) ? 'A classe é obrigatória' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _levelController,
-                decoration: const InputDecoration(
-                  labelText: 'Nível',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'O nível é obrigatório';
-                  }
-                  if (int.tryParse(value) == null) {
-                    return 'Por favor, insira um número válido';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: _selectedClass,
+                    decoration: const InputDecoration(
+                      labelText: 'Classe (vinda da API)',
+                      border: OutlineInputBorder(),
+                    ),
+                    hint: controller.loadedClasses.isEmpty
+                        ? const Text('Carregando classes...')
+                        : const Text('Selecione uma classe'),
+                    items: controller.loadedClasses.isEmpty
+                        ? []
+                        : controller.loadedClasses.map((String className) {
+                      return DropdownMenuItem<String>(
+                        value: className,
+                        child: Text(className),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedClass = newValue;
+                      });
+                    },
+                    validator: (value) => value == null ? 'Selecione uma classe' : null,
+                  ),
 
-              DropdownButtonFormField<String>(
-                value: _selectedSystem,
-                decoration: const InputDecoration(
-                  labelText: 'Sistema',
-                  border: OutlineInputBorder(),
-                ),
-                hint: const Text('Selecione o sistema de RPG'),
-                items: availableSystems.map((String system) {
-                  return DropdownMenuItem<String>(
-                    value: system,
-                    child: Text(system),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedSystem = newValue;
-                  });
-                },
-                validator: (value) => value == null ? 'Selecione um sistema' : null,
-              ),
+                  const SizedBox(height: 16),
 
-              const SizedBox(height: 24),
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                onPressed: _submitForm,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text('CRIAR FICHA'),
+                  DropdownButtonFormField<String>(
+                    value: _selectedSystem,
+                    decoration: const InputDecoration(labelText: 'Sistema', border: OutlineInputBorder()),
+                    items: controller.availableSystems.map((String system) {
+                      return DropdownMenuItem<String>(value: system, child: Text(system));
+                    }).toList(),
+                    onChanged: (val) => setState(() => _selectedSystem = val),
+                    validator: (value) => value == null ? 'Selecione um sistema' : null,
+                  ),
+
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _levelController,
+                    decoration: const InputDecoration(labelText: 'Nível', border: OutlineInputBorder()),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => (value?.isEmpty ?? true) ? 'Obrigatório' : null,
+                  ),
+                  const SizedBox(height: 24),
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ElevatedButton(
+                    onPressed: _submitForm,
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                    child: const Text('CRIAR FICHA'),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

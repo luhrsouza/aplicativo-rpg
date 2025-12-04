@@ -6,6 +6,7 @@ import '../../controllers/campaign_controller.dart';
 import '../../models/campaign.dart';
 import '../../models/session.dart';
 import '../../models/user.dart' as app_user;
+import '../widgets/dice_roller_dialog.dart';
 
 class CampaignDetailsScreen extends StatefulWidget {
   final String campaignId;
@@ -130,6 +131,18 @@ class _CampaignDetailsScreenState extends State<CampaignDetailsScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Text(campaign.name),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.casino),
+                tooltip: 'Rolar Dados',
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const DiceRollerDialog(),
+                  );
+                },
+              ),
+            ],
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
